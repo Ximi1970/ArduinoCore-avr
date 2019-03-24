@@ -23,7 +23,9 @@
 
 #ifndef HardwareSerial_h
 #define HardwareSerial_h
-
+ 
+#define HWSERIAL_9BIT
+ 
 #include <inttypes.h>
 
 #include "Stream.h"
@@ -63,6 +65,11 @@ typedef uint16_t rx_buffer_index_t;
 #else
 typedef uint8_t rx_buffer_index_t;
 #endif
+#ifdef HWSERIAL_9BIT
+typedef unsigned short serial_data_t;
+#else
+typedef unsigned char serial_data_t;
+#endif // HWSERIAL_9BIT
 
 // Define config for Serial.begin(baud, config);
 #define SERIAL_5N1 0x00
@@ -90,6 +97,17 @@ typedef uint8_t rx_buffer_index_t;
 #define SERIAL_7O2 0x3C
 #define SERIAL_8O2 0x3E
 
+#ifdef HWSERIAL_9BIT
+
+#define SERIAL_9N1 0x106
+#define SERIAL_9N2 (0x106 + SERIAL_5N2)
+#define SERIAL_9E1 (0x106 + SERIAL_5E1)
+#define SERIAL_9E2 (0x106 + SERIAL_5E2)
+#define SERIAL_9O1 (0x106 + SERIAL_5O1)
+#define SERIAL_9O2 (0x106 + SERIAL_5O2)
+
+#endif // HWSERIAL_9BIT
+
 class HardwareSerial : public Stream
 {
   protected:
@@ -101,6 +119,10 @@ class HardwareSerial : public Stream
     volatile uint8_t * const _udr;
     // Has any byte been written to the UART since begin()
     bool _written;
+    
+#ifdef HWSERIAL_9BIT
+    volatile bool use9bit;
+#endif // HWSERIAL_9BIT
 
     volatile rx_buffer_index_t _rx_buffer_head;
     volatile rx_buffer_index_t _rx_buffer_tail;
@@ -110,8 +132,8 @@ class HardwareSerial : public Stream
     // Don't put any members after these buffers, since only the first
     // 32 bytes of this struct can be accessed quickly using the ldd
     // instruction.
-    unsigned char _rx_buffer[SERIAL_RX_BUFFER_SIZE];
-    unsigned char _tx_buffer[SERIAL_TX_BUFFER_SIZE];
+    serial_data_t _rx_buffer[SERIAL_RX_BUFFER_SIZE];
+    serial_data_t _tx_buffer[SERIAL_TX_BUFFER_SIZE];
 
   public:
     inline HardwareSerial(
@@ -119,14 +141,21 @@ class HardwareSerial : public Stream
       volatile uint8_t *ucsra, volatile uint8_t *ucsrb,
       volatile uint8_t *ucsrc, volatile uint8_t *udr);
     void begin(unsigned long baud) { begin(baud, SERIAL_8N1); }
-    void begin(unsigned long, uint8_t);
+    void begin(unsigned long, uint16_t);
     void end();
     virtual int available(void);
     virtual int peek(void);
     virtual int read(void);
     virtual int availableForWrite(void);
     virtual void flush(void);
+#ifdef HWSERIAL_9BIT
+    size_t write9(unsigned int);
+    inline size_t write9(long n) { return write9((unsigned int)n); }
+    inline size_t write9(int n) { return write9((unsigned int)n); }
+    inline size_t write(uint8_t n) { return write9((unsigned int)n); }
+#else // !defined(HWSERIAL_9BIT)
     virtual size_t write(uint8_t);
+#endif // HWSERIAL_9BIT
     inline size_t write(unsigned long n) { return write((uint8_t)n); }
     inline size_t write(long n) { return write((uint8_t)n); }
     inline size_t write(unsigned int n) { return write((uint8_t)n); }
